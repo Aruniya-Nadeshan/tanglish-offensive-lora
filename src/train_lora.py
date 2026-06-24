@@ -1,4 +1,3 @@
-%%writefile src/train_lora.py
 import os, sys, json, torch
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 sys.path.insert(0, os.path.dirname(__file__))
