@@ -9,7 +9,7 @@ from datasets import Dataset
 import wandb
 
 MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
-CHECKPOINT_DIR = "/content/drive/MyDrive/tanglish-project/checkpoints"
+CHECKPOINT_DIR = "/content/checkpoints"
 
 def load_jsonl(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -18,8 +18,8 @@ def load_jsonl(path):
 def main():
     wandb.login()
 
-    train_dataset = Dataset.from_list(load_jsonl("data/train_formatted.jsonl"))
-    dev_dataset   = Dataset.from_list(load_jsonl("data/dev_formatted.jsonl"))
+    train_dataset = Dataset.from_list(load_jsonl("/content/data/train_formatted.jsonl"))
+    dev_dataset   = Dataset.from_list(load_jsonl("/content/data/dev_formatted.jsonl"))
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True, bnb_4bit_quant_type="nf4",
@@ -53,7 +53,7 @@ def main():
         save_strategy="steps",
         save_steps=100,
         eval_strategy="steps",
-        eval_steps=500,
+        eval_steps=655,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         report_to="wandb",
