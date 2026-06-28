@@ -1,6 +1,5 @@
 import os, sys, json, torch
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-sys.path.insert(0, os.path.dirname(__file__))
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, TrainingArguments
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -9,7 +8,8 @@ from datasets import Dataset
 import wandb
 
 MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
-CHECKPOINT_DIR = "/content/checkpoints"
+CHECKPOINT_DIR = "/content/drive/MyDrive/tanglish-project/checkpoints"
+ADAPTER_DIR = "/content/drive/MyDrive/tanglish-project/tanglish-lora-adapter"
 
 def load_jsonl(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -18,8 +18,9 @@ def load_jsonl(path):
 def main():
     wandb.login()
 
-    train_dataset = Dataset.from_list(load_jsonl("/content/data/train_formatted.jsonl"))
+    train_dataset = Dataset.from_list(load_jsonl("/content/data/train_sample_formatted.jsonl"))
     dev_dataset   = Dataset.from_list(load_jsonl("/content/data/dev_formatted.jsonl"))
+    print(f"Train: {len(train_dataset)} | Dev: {len(dev_dataset)}")
 
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True, bnb_4bit_quant_type="nf4",
@@ -52,12 +53,11 @@ def main():
         logging_steps=10,
         save_strategy="steps",
         save_steps=100,
-        eval_strategy="steps",
-        eval_steps=655,
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
+        eval_strategy="no",
+        load_best_model_at_end=False,
         report_to="wandb",
-        run_name="tanglish-lora-r16-lr2e4-full",
+        run_name="tanglish-lora-r16-lr2e4-final",
+        max_steps=300,
     )
 
     trainer = SFTTrainer(
@@ -68,16 +68,19 @@ def main():
         processing_class=tokenizer,
     )
 
-    trainer.train(
-        resume_from_checkpoint=True if os.path.exists(CHECKPOINT_DIR) and
-        any("checkpoint" in d for d in os.listdir(CHECKPOINT_DIR)) else None
-    )
+    resume = None
+    if os.path.exists(CHECKPOINT_DIR):
+        ckpts = [d for d in os.listdir(CHECKPOINT_DIR) if "checkpoint" in d]
+        if ckpts:
+            resume = True
+            print(f"Resuming from checkpoint")
 
-    # Save the final LoRA adapter
-    adapter_path = "/content/drive/MyDrive/tanglish-project/tanglish-lora-adapter"
-    model.save_pretrained(adapter_path)
-    tokenizer.save_pretrained(adapter_path)
-    print(f"Adapter saved to {adapter_path}")
+    trainer.train(resume_from_checkpoint=resume)
+
+    os.makedirs(ADAPTER_DIR, exist_ok=True)
+    model.save_pretrained(ADAPTER_DIR)
+    tokenizer.save_pretrained(ADAPTER_DIR)
+    print(f"Adapter saved to {ADAPTER_DIR}")
 
 if __name__ == "__main__":
     main()
